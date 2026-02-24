@@ -36,6 +36,7 @@ const apiFetch = async (endpoint, options = {}) => {
 const api = {
     getProducts: () => apiFetch('/products'),
     getAlerts: () => apiFetch('/alerts'),
+    
     getInsights: () => apiFetch('/insights'),
     sellProduct: (id) => apiFetch(`/products/${id}/sell`, { method: 'PATCH' }),
     login: (email, password) => apiFetch('/users/login', {

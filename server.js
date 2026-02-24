@@ -16,6 +16,10 @@ app.use(express.static('public'));
 // Multer setup for file uploads
 const upload = multer({ dest: 'uploads/' });
 
+
+const cors = require('cors');
+app.use(cors());
+
 // --- API Routes ---
 app.use('/api/products', productRoutes);
 app.use('/api/users', authRoutes);
