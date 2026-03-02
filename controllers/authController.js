@@ -1,6 +1,6 @@
 const User = require('../models/userModel');
 const jwt = require('jsonwebtoken');
-const asyncHandler = require('./asyncHandler');
+const asyncHandler = require('../middleware/asyncHandler');
 
 const generateToken = (id) => {
     // Ensure JWT_SECRET exists to avoid 500 errors

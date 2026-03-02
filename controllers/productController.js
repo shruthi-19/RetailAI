@@ -1,128 +1,183 @@
+const asyncHandler = require('../middleware/asyncHandler');
 const Product = require('../models/productModel');
 const Transaction = require('../models/transactionModel');
 const csv = require('csv-parser');
 const fs = require('fs');
 const path = require('path');
 
-// 1. The Ledger: Add a new product
-const addProduct = async (req, res) => {
-    try {
-        const product = new Product(req.body);
-        await product.save();
-        res.status(201).json(product);
-    } catch (error) {
-        res.status(400).json({ message: error.message });
-    }
-};
+/* ==========================================
+   1️⃣ Add Product (Ledger Entry)
+========================================== */
+const addProduct = asyncHandler(async (req, res) => {
+    const product = new Product({
+        ...req.body,
+        ownerID: req.user._id,
+    });
 
-// 2. Get All Products
-const getAllProducts = async (req, res) => {
-    try {
-        const products = await Product.find();
-        res.json(products);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-};
+    const createdProduct = await product.save();
+    res.status(201).json(createdProduct);
+});
 
-// 3. The Sentinel: Get items with low freshness or low stock
-const getAlerts = async (req, res) => {
-    try {
-        const lowStockThreshold = 10; // Example low stock threshold
-        const freshnessThreshold = 0.1; // 10% freshness
+/* ==========================================
+   2️⃣ Get All Products (User Scoped)
+========================================== */
+const getAllProducts = asyncHandler(async (req, res) => {
+    const products = await Product.find({
+        ownerID: req.user._id,
+    });
 
-        const products = await Product.find();
+    res.json(products);
+});
 
-        const alerts = products.filter(p => {
-            const freshness = p.freshnessIndex;
-            return p.quantity < p.minThreshold || (freshness < freshnessThreshold && freshness > 0);
-        }).map(p => ({
-            name: p.name,
-            quantity: p.quantity,
-            freshnessIndex: p.freshnessIndex,
-            reason: p.quantity < p.minThreshold ? `Low stock (${p.quantity} left)` : `Nearing expiry (freshness: ${(p.freshnessIndex * 100).toFixed(0)}%)`
+/* ==========================================
+   3️⃣ Sentinel Alerts (Expiry + Low Stock)
+========================================== */
+const getAlerts = asyncHandler(async (req, res) => {
+    const lowStockThreshold = 10;
+    const freshnessThreshold = 0.1;
+
+    const products = await Product.find({
+        ownerID: req.user._id,
+    });
+
+    const alerts = products
+        .filter((product) => {
+            const freshness = product.freshnessIndex;
+            return (
+                product.quantity < product.minThreshold ||
+                (freshness < freshnessThreshold && freshness > 0)
+            );
+        })
+        .map((product) => ({
+            name: product.name,
+            quantity: product.quantity,
+            freshnessIndex: product.freshnessIndex,
+            reason:
+                product.quantity < product.minThreshold
+                    ? `Low stock (${product.quantity} left)`
+                    : `Nearing expiry (${(product.freshnessIndex * 100).toFixed(0)}%)`,
         }));
 
-        res.json(alerts);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+    res.json(alerts);
+});
+
+/* ==========================================
+   4️⃣ Quick Sell Product (Flow + Transaction)
+========================================== */
+const quickSellProduct = asyncHandler(async (req, res) => {
+    const { quantity } = req.body;
+
+    const product = await Product.findOne({
+        _id: req.params.id,
+        ownerID: req.user._id,
+    });
+
+    if (!product) {
+        res.status(404);
+        throw new Error('Product not found');
     }
-};
 
-// 4. The Flow: Sell a product and reduce quantity
-const sellProduct = async (req, res) => {
-    try {
-        const product = await Product.findById(req.params.id);
-        if (!product) {
-            return res.status(404).json({ message: 'Product not found.' });
-        }
-
-        if (product.quantity < 1) {
-            return res.status(400).json({ message: 'Not enough stock to sell.' });
-        }
-
-        // Decrement quantity by 1
-        product.quantity -= 1;
-        await product.save();
-
-        // Create a transaction record
-        const transaction = new Transaction({
-            productId: product._id,
-            productName: product.name,
-            quantitySold: 1,
-            price: product.price
-        });
-        await transaction.save();
-
-        res.json({ message: `Sold 1 of ${product.name}. Remaining stock: ${product.quantity}`, product });
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+    if (product.quantity < quantity) {
+        res.status(400);
+        throw new Error('Not enough stock');
     }
-};
 
-// 5. Bulk Upload Products from CSV
-const uploadProducts = (req, res) => {
+    product.quantity -= quantity;
+    await product.save();
+
+    await Transaction.create({
+        product: product._id,
+        ownerID: req.user._id,
+        type: 'Sale',
+        quantity: Number(quantity),
+    });
+
+    res.json({
+        message: 'Product sold successfully',
+        remainingStock: product.quantity,
+        product,
+    });
+});
+
+/* ==========================================
+   5️⃣ Quick Restock Product
+========================================== */
+const quickRestockProduct = asyncHandler(async (req, res) => {
+    const { quantity } = req.body;
+
+    const product = await Product.findOne({
+        _id: req.params.id,
+        ownerID: req.user._id,
+    });
+
+    if (!product) {
+        res.status(404);
+        throw new Error('Product not found');
+    }
+
+    product.quantity += Number(quantity);
+    await product.save();
+
+    await Transaction.create({
+        product: product._id,
+        ownerID: req.user._id,
+        type: 'Restock',
+        quantity: Number(quantity),
+    });
+
+    res.json({
+        message: 'Product restocked successfully',
+        updatedStock: product.quantity,
+        product,
+    });
+});
+
+/* ==========================================
+   6️⃣ Bulk Upload Products (CSV)
+========================================== */
+const uploadProducts = asyncHandler(async (req, res) => {
+    if (!req.file) {
+        res.status(400);
+        throw new Error('No file uploaded');
+    }
+
     const results = [];
-    const filePath = path.join(process.cwd(), req.file.path);
-
-    // Log user to ensure it's populated by 'protect' middleware
-    console.log('User in uploadProducts:', req.user);
-
-    // Ensure user is attached to the request
-    if (!req.user || !req.user._id) {
-        // Clean up the uploaded file before sending the response
-        fs.unlinkSync(filePath);
-        return res.status(401).json({ message: 'Not authorized, user not found.' });
-    }
+    const filePath = path.resolve(req.file.path);
 
     fs.createReadStream(filePath)
         .pipe(csv())
         .on('data', (data) => results.push(data))
         .on('end', async () => {
-            // Clean up the uploaded file
-            fs.unlinkSync(filePath); 
-            try {
-                // Add ownerID to each product before inserting
-                const productsToInsert = results.map(product => ({
-                    ...product,
-                    ownerID: req.user._id
-                }));
-                if (results.length > 0) {
-                    await Product.insertMany(productsToInsert);
-                    res.status(201).json({ message: 'Products uploaded successfully.', count: results.length });
-                } else {
-                    res.status(400).json({ message: 'CSV file is empty or invalid.' });
-                }
-            } catch (error) {
-                res.status(500).json({ message: error.message });
+            fs.unlinkSync(filePath);
+
+            if (!results.length) {
+                return res.status(400).json({
+                    message: 'CSV is empty or invalid',
+                });
             }
+
+            const productsToInsert = results.map((product) => ({
+                ...product,
+                quantity: Number(product.quantity),
+                price: Number(product.price),
+                minThreshold: Number(product.minThreshold),
+                ownerID: req.user._id,
+            }));
+
+            await Product.insertMany(productsToInsert);
+
+            res.status(201).json({
+                message: 'Products uploaded successfully',
+                count: productsToInsert.length,
+            });
         });
-};
+});
 
 module.exports = {
     addProduct,
     getAllProducts,
     getAlerts,
-    sellProduct,
-    uploadProducts
+    quickSellProduct,
+    quickRestockProduct,
+    uploadProducts,
 };

@@ -1,20 +1,22 @@
 const express = require('express');
 const router = express.Router();
-const multer = require('multer');
 const {
     addProduct,
     getAllProducts,
     getAlerts,
-    sellProduct,
-    uploadProducts
-} = require('../controllers/productController.js');
-const { protect } = require('../middleware/authMiddleware.js');
+    quickSellProduct,
+    quickRestockProduct,
+    uploadProducts,
+} = require('../controllers/productController');
 
-const upload = multer({ dest: 'uploads/' });  
+const { protect } = require('../middleware/authMiddleware');
+const upload = require('../middleware/multerMiddleware');
 
 router.post('/', protect, addProduct);
 router.get('/', protect, getAllProducts);
 router.get('/alerts', protect, getAlerts);
-router.patch('/sell/:id', protect, sellProduct);
+router.post('/:id/sell', protect, quickSellProduct);
+router.post('/:id/restock', protect, quickRestockProduct);
 router.post('/upload', protect, upload.single('file'), uploadProducts);
+
 module.exports = router;

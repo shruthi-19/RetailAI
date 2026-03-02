@@ -1,0 +1,3 @@
+name,quantity,expiryDate,price,minThreshold
+Bread,20,2026-03-10,30,5
+Eggs,100,2026-03-05,6,20
