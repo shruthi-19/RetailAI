@@ -85,6 +85,16 @@ const uploadProducts = (req, res) => {
     const results = [];
     const filePath = path.join(process.cwd(), req.file.path);
 
+    // Log user to ensure it's populated by 'protect' middleware
+    console.log('User in uploadProducts:', req.user);
+
+    // Ensure user is attached to the request
+    if (!req.user || !req.user._id) {
+        // Clean up the uploaded file before sending the response
+        fs.unlinkSync(filePath);
+        return res.status(401).json({ message: 'Not authorized, user not found.' });
+    }
+
     fs.createReadStream(filePath)
         .pipe(csv())
         .on('data', (data) => results.push(data))
@@ -92,8 +102,13 @@ const uploadProducts = (req, res) => {
             // Clean up the uploaded file
             fs.unlinkSync(filePath); 
             try {
+                // Add ownerID to each product before inserting
+                const productsToInsert = results.map(product => ({
+                    ...product,
+                    ownerID: req.user._id
+                }));
                 if (results.length > 0) {
-                    await Product.insertMany(results);
+                    await Product.insertMany(productsToInsert);
                     res.status(201).json({ message: 'Products uploaded successfully.', count: results.length });
                 } else {
                     res.status(400).json({ message: 'CSV file is empty or invalid.' });
