@@ -1,4 +1,6 @@
 const mongoose = require('mongoose');
+const User = require('./userModel');
+
 
 const productSchema = new mongoose.Schema({
     name: String,
@@ -7,6 +9,11 @@ const productSchema = new mongoose.Schema({
     expiryDate: Date,
     price: Number,
     minThreshold: { type: Number, default: 5 }, // For Stock-out alerts
+    ownerID: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true
+    },
 }, { timestamps: true }); // This adds createdAt and updatedAt
 
 // Virtual for Freshness Index: FI = (TL - TE) / TL
