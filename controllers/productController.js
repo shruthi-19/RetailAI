@@ -21,46 +21,57 @@ const addProduct = asyncHandler(async (req, res) => {
 /* ==========================================
    2️⃣ Get All Products (User Scoped)
 ========================================== */
+const { getExpiryStatus } = require('../utils/expiry');
 const getAllProducts = asyncHandler(async (req, res) => {
     const products = await Product.find({
         ownerID: req.user._id,
     });
 
-    res.json(products);
+    const productsWithStatus = products.map(product => {
+        const productObj = product.toObject();
+        return {
+            ...productObj,
+            expiryStatus: getExpiryStatus(product.expiryDate),
+        };
+    });
+
+    res.json(productsWithStatus);
 });
 
 /* ==========================================
    3️⃣ Sentinel Alerts (Expiry + Low Stock)
 ========================================== */
-const getAlerts = asyncHandler(async (req, res) => {
-    const lowStockThreshold = 10;
-    const freshnessThreshold = 0.1;
 
+const getAlerts = asyncHandler(async (req, res) => {
     const products = await Product.find({
         ownerID: req.user._id,
     });
 
     const alerts = products
-        .filter((product) => {
-            const freshness = product.freshnessIndex;
-            return (
-                product.quantity < product.minThreshold ||
-                (freshness < freshnessThreshold && freshness > 0)
-            );
-        })
-        .map((product) => ({
-            name: product.name,
-            quantity: product.quantity,
-            freshnessIndex: product.freshnessIndex,
-            reason:
-                product.quantity < product.minThreshold
+        .map(product => {
+            const expiryStatus = getExpiryStatus(product.expiryDate);
+
+            const lowStock = product.quantity < product.minThreshold;
+            const expiryProblem =
+                expiryStatus === 'Expired' ||
+                expiryStatus === 'Warning';
+
+            if (!lowStock && !expiryProblem) return null;
+
+            return {
+                _id: product._id,
+                name: product.name,
+                quantity: product.quantity,
+                expiryStatus,
+                reason: lowStock
                     ? `Low stock (${product.quantity} left)`
-                    : `Nearing expiry (${(product.freshnessIndex * 100).toFixed(0)}%)`,
-        }));
+                    : `Product is ${expiryStatus}`,
+            };
+        })
+        .filter(Boolean);
 
     res.json(alerts);
 });
-
 /* ==========================================
    4️⃣ Quick Sell Product (Flow + Transaction)
 ========================================== */
