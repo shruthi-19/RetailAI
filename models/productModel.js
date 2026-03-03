@@ -8,7 +8,11 @@ const productSchema = new mongoose.Schema({
     purchaseDate: { type: Date, default: Date.now },
     expiryDate: Date,
     price: Number,
-    minThreshold: { type: Number, default: 5 }, // For Stock-out alerts
+    minThreshold: { type: Number, default: 5 }, 
+    category: {
+        type: String,
+        default: 'General'
+    },// For Stock-out alerts
     ownerID: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
