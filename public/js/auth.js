@@ -1,55 +1,113 @@
-document.addEventListener('DOMContentLoaded', () => {
-    const loginForm = document.getElementById('login-form');
-    const signupForm = document.getElementById('signup-form');
-    const logoutBtn = document.getElementById('logout-btn');
+// public/js/auth.js
 
-    const loginError = document.getElementById('login-error');
-    const signupError = document.getElementById('signup-error');
+const API_BASE = "/api/users"; // Adjust if needed
 
-    // --- Event Listeners ---
+document.addEventListener("DOMContentLoaded", () => {
+
+    /* ========================================
+       LOGIN FUNCTION
+    ======================================== */
+    const loginForm = document.getElementById("login-form");
+
     if (loginForm) {
-        loginForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        loginError.textContent = '';
-        const email = document.getElementById('login-email').value;
-        const password = document.getElementById('login-password').value;
+        loginForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
 
-        try {
-            const { token, name } = await api.login(email, password);
-            localStorage.setItem('token', token);
-            localStorage.setItem('userName', name);
-            window.location.href = '/index.html'; // Redirect to dashboard
-        } catch (error) {
-            loginError.textContent = error.message;
-        }
-    });
+            const email = document.getElementById("email").value.trim();
+            const password = document.getElementById("password").value.trim();
+
+            try {
+                const res = await fetch(`${API_BASE}/login`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await res.json();
+
+                if (!res.ok) {
+                    throw new Error(data.message || "Login failed");
+                }
+
+                // Store token + user info
+                localStorage.setItem("token", data.token);
+                localStorage.setItem("userName", data.name);
+                localStorage.setItem("userId", data._id);
+
+                // Redirect to app
+                window.location.href = "/app.html";
+
+            } catch (err) {
+                alert(err.message);
+            }
+        });
     }
+
+    /* ========================================
+       SIGNUP FUNCTION
+    ======================================== */
+    const signupForm = document.getElementById("signup-form");
 
     if (signupForm) {
-        signupForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        signupError.textContent = '';
-        const name = document.getElementById('signup-name').value;
-        const email = document.getElementById('signup-email').value;
-        const password = document.getElementById('signup-password').value;
+        signupForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
 
-        try {
-            const { token, name: userName } = await api.signup(name, email, password);
-            localStorage.setItem('token', token);
-            localStorage.setItem('userName', userName);
-            window.location.href = '/index.html'; // Redirect to dashboard
-        } catch (error) {
-            signupError.textContent = error.message;
-        }
-    });
+            const name = document.getElementById("name").value.trim();
+            const email = document.getElementById("email").value.trim();
+            const password = document.getElementById("password").value.trim();
+
+            try {
+                const res = await fetch(`${API_BASE}/signup`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ name, email, password })
+                });
+
+                const data = await res.json();
+
+                if (!res.ok) {
+                    throw new Error(data.message || "Signup failed");
+                }
+
+                alert("Account created successfully! Please login.");
+                window.location.href = "/index.html";
+
+            } catch (err) {
+                alert(err.message);
+            }
+        });
     }
+
+    /* ========================================
+       PROTECT app.html (Redirect if no token)
+    ======================================== */
+    const isAppPage = window.location.pathname.includes("app.html");
+
+    if (isAppPage) {
+        const token = localStorage.getItem("token");
+
+        if (!token) {
+            window.location.href = "/index.html";
+        }
+    }
+
+    /* ========================================
+       LOGOUT FUNCTION
+    ======================================== */
+    const logoutBtn = document.getElementById("logout-btn");
 
     if (logoutBtn) {
-        logoutBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        localStorage.removeItem('token');
-        localStorage.removeItem('userName');
-            window.location.href = '/pages/login.html'; // Redirect to login
-    });
+        logoutBtn.addEventListener("click", () => {
+            localStorage.removeItem("token");
+            localStorage.removeItem("userName");
+            localStorage.removeItem("userId");
+
+            window.location.href = "/index.html";
+        });
     }
+
 });

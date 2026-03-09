@@ -1,126 +1,218 @@
-document.addEventListener('DOMContentLoaded', () => {
-    const userNameEl = document.getElementById('user-name');
+// public/js/main.js
 
-    const token = localStorage.getItem('token');
-    const userName = localStorage.getItem('userName');
+document.addEventListener("DOMContentLoaded", () => {
 
+    /* ========================================
+       PAGE PROTECTION
+    ======================================== */
+
+    const token = localStorage.getItem("token");
     if (!token) {
-        window.location.href = '/pages/login.html'; // Redirect to login if not authenticated
+        window.location.href = "/index.html";
         return;
     }
 
-    // --- If token exists, show dashboard ---
-    userNameEl.textContent = `Welcome, ${userName || 'User'}`;
+    /* ========================================
+       ELEMENT REFERENCES
+    ======================================== */
 
-    const inventoryBody = document.getElementById('inventory-table-body');
-    const lowStockTrendsList = document.getElementById('low-stock-trends-list');
-    const dateTimeDiv = document.getElementById('current-datetime');
+    const navLinks = document.querySelectorAll(".sidebar .nav-link");
+    const views = document.querySelectorAll(".view");
 
-    // Metric cards
-    const totalValueEl = document.getElementById('total-value');
-    const expiryAlertsEl = document.getElementById('expiry-alerts');
-    const lowStockAlertsEl = document.getElementById('low-stock-alerts');
+    const inventoryTableBody = document.getElementById("inventory-table-body");
+    const insightsList = document.getElementById("insights-list");
 
-    // --- Data Fetching and Rendering ---
+    const totalValueEl = document.getElementById("total-value");
+    const criticalAlertsEl = document.getElementById("critical-alerts");
+    const totalProductsEl = document.getElementById("total-products");
+    const profileButton = document.getElementById("profile-button");
 
-    const renderProducts = (products) => {
-        inventoryBody.innerHTML = '';
-        let totalValue = 0;
+    /* ========================================
+       SPA VIEW SWITCHING
+    ======================================== */
 
-        products.forEach(product => {
-            totalValue += (product.quantity || 0) * (product.price || 0);
+    const switchView = async (viewId) => {
+        // Hide all views
+        views.forEach(view => view.classList.add("d-none"));
 
-            const freshness = product.freshnessIndex ? (product.freshnessIndex * 100).toFixed(0) : 'N/A';
-            let statusBadge;
-            if (freshness < 10 && freshness !== 'N/A') {
-                statusBadge = '<span class="status-badge status-expired">Expired</span>';
-            } else if (product.quantity < product.minThreshold) {
-                statusBadge = '<span class="status-badge status-warning">Low Stock</span>';
-            } else {
-                statusBadge = '<span class="status-badge status-safe">Safe</span>';
+        // Show selected view
+        document.getElementById(viewId).classList.remove("d-none");
+
+        // Update active sidebar
+        navLinks.forEach(link => {
+            link.classList.remove("active");
+            if (link.dataset.view === viewId) {
+                link.classList.add("active");
             }
-
-            const row = `<tr>
-                <td>${product.name}</td>
-                <td>${product.quantity}</td>
-                <td>$${(product.price || 0).toFixed(2)}</td>
-                <td>${statusBadge}</td>
-                <td class="actions">
-                    <button class="action-btn" onclick="handleSellProduct('${product._id}')" title="Quick Sell">
-                        <i class="fas fa-dollar-sign"></i>
-                    </button>
-                    <button class="action-btn" onclick="handleRestockProduct('${product._id}')" title="Restock">
-                        <i class="fas fa-box-open"></i>
-                    </button>
-                </td>
-            </tr>`;
-            inventoryBody.innerHTML += row;
         });
-    };
 
-    const renderAlerts = (alerts) => {
-        const lowStockCount = alerts.filter(a => a.reason.includes('Low stock')).length;
-        const expiryCount = alerts.length - lowStockCount;
+        // Load data depending on view
+        if (viewId === "dashboard-view") {
+            await loadDashboard();
+        }
 
-        lowStockAlertsEl.textContent = lowStockCount;
-        expiryAlertsEl.textContent = expiryCount;
-    };
+        if (viewId === "inventory-view") {
+            await loadInventory();
+        }
 
-    const renderMetrics = (products, alerts) => {
-        const totalValue = products.reduce((sum, p) => sum + (p.quantity * p.price), 0);
-        totalValueEl.textContent = `$${totalValue.toFixed(2)}`;
-    };
-
-    const renderInsights = (insights) => {
-        lowStockTrendsList.innerHTML = '';
-        // This is a placeholder; you would filter insights by type from the backend
-        insights.forEach(insight => {
-            const item = `<li class="list-group-item"><strong>${insight.name}:</strong> ${insight.suggestion} (Avg daily sales: ${insight.avgDailySales})</li>`;
-            lowStockTrendsList.innerHTML += item;
-        });
-    };
-
-    // --- UI Updates ---
-
-    const updateDateTime = () => {
-        dateTimeDiv.textContent = new Date().toLocaleString();
-    };
-
-    // --- Event Handlers ---
-
-    window.handleSellProduct = async (id) => {
-        await api.sellProduct(id);
-        loadDashboard();
-    };
-
-    window.handleRestockProduct = async (id) => {
-        // TODO: Implement logic to show a modal to add stock.
-        console.log('Restocking product:', id);
-    };
-
-    // --- Initial Load ---
-
-    const loadDashboard = async () => {
-        try {
-            const [products, alerts, insights] = await Promise.all([
-                api.getProducts(),
-                api.getAlerts(),
-                api.getInsights()
-            ]);
-            renderProducts(products); // Also calculates total value
-            renderMetrics(products, alerts);
-            renderAlerts(alerts); // Populates alert cards
-            renderInsights(insights);
-        } catch (error) {
-            console.error("Failed to load dashboard data:", error.message);
-            if (error.message.includes('401') || error.message.includes('403')) {
-                // If token is invalid or expired, redirect to login
-                window.location.href = '/pages/login.html';
-            }
+        if (viewId === "insights-view") {
+            await loadInsights();
         }
     };
 
-    loadDashboard();
-    updateDateTime();
-    setInterval(updateDateTime, 1000);
+    navLinks.forEach(link => {
+        link.addEventListener("click", (e) => {
+            e.preventDefault();
+            switchView(link.dataset.view);
+        });
+    });
+
+    /* ========================================
+       DASHBOARD LOGIC
+    ======================================== */
+
+    const loadDashboard = async () => {
+        try {
+            const data = await api.getDashboardData();
+
+            totalValueEl.textContent = `$${data.totalInventoryValue.toFixed(2)}`;
+            criticalAlertsEl.textContent = data.criticalAlertsCount;
+            totalProductsEl.textContent = data.totalProducts;
+            profileButton.textContent = data.userName;
+
+        } catch (error) {
+            console.error("Dashboard load failed:", error.message);
+        }
+    };
+
+    /* ========================================
+       INVENTORY LOGIC
+    ======================================== */
+
+    const loadInventory = async () => {
+        try {
+            const products = await api.getProducts();
+            renderInventory(products);
+
+        } catch (error) {
+            console.error("Inventory load failed:", error.message);
+        }
+    };
+
+    const renderInventory = (products) => {
+        inventoryTableBody.innerHTML = "";
+
+        if (!products.length) {
+            inventoryTableBody.innerHTML = `
+                <tr><td colspan="5" class="text-center">No products found</td></tr>
+            `;
+            return;
+        }
+
+        products.forEach(product => {
+
+            const status = product.expiryStatus || "Safe";
+
+            const badgeClass =
+                status === "Expired"
+                    ? "bg-danger"
+                    : status === "Warning"
+                    ? "bg-warning text-dark"
+                    : "bg-success";
+
+            const row = `
+                <tr>
+                    <td>${product.name}</td>
+                    <td>${product.quantity}</td>
+                    <td>$${product.price}</td>
+                    <td><span class="badge ${badgeClass}">${status}</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary me-2"
+                            onclick="handleSell('${product._id}')">
+                            Sell
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary"
+                            onclick="handleRestock('${product._id}')">
+                            Restock
+                        </button>
+                    </td>
+                </tr>
+            `;
+
+            inventoryTableBody.innerHTML += row;
+        });
+    };
+
+    /* ========================================
+       SELL PRODUCT
+    ======================================== */
+
+    window.handleSell = async (id) => {
+        const quantity = prompt("Enter quantity to sell:", 1);
+
+        if (!quantity || quantity <= 0) return;
+
+        try {
+            await api.sellProduct(id, Number(quantity));
+            await loadInventory();
+        } catch (error) {
+            alert(error.message);
+        }
+    };
+
+    /* ========================================
+       RESTOCK PRODUCT
+    ======================================== */
+
+    window.handleRestock = async (id) => {
+        const quantity = prompt("Enter quantity to restock:", 1);
+
+        if (!quantity || quantity <= 0) return;
+
+        try {
+            await api.restockProduct(id, Number(quantity));
+            await loadInventory();
+        } catch (error) {
+            alert(error.message);
+        }
+    };
+
+    /* ========================================
+       INSIGHTS LOGIC
+    ======================================== */
+
+    const loadInsights = async () => {
+        try {
+            const insights = await api.getInsights();
+
+            insightsList.innerHTML = "";
+
+            if (!insights.length) {
+                insightsList.innerHTML = `
+                    <li class="list-group-item">
+                        No insights available yet.
+                    </li>
+                `;
+                return;
+            }
+
+            insights.forEach(item => {
+                insightsList.innerHTML += `
+                    <li class="list-group-item">
+                        <strong>${item.name}:</strong> ${item.suggestion}
+                    </li>
+                `;
+            });
+
+        } catch (error) {
+            console.error("Insights load failed:", error.message);
+        }
+    };
+
+    /* ========================================
+       INITIAL LOAD
+    ======================================== */
+
+    switchView("dashboard-view");
+
 });

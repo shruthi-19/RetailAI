@@ -1,6 +1,5 @@
 name,quantity,purchaseDate,expiryDate,price,minThreshold
-Organic Milk,50,2026-02-01,2026-03-15,45,10
-Brown Bread,30,2026-02-05,2026-02-28,25,5
-Eggs Pack,100,2026-02-10,2026-03-05,6,20
-Butter 500g,20,2026-02-08,2026-04-01,55,5
-Cheddar Cheese,15,2026-02-03,2026-03-25,120,3
+Bread,30,2026-02-05,2026-02-28,25,5
+biscuits Pack,100,2026-02-10,2026-03-05,6,20
+Amul ChocolateButter 500g,20,2026-02-08,2026-04-01,55,5
+Sour Creamheese,15,2026-02-03,2026-03-25,120,3

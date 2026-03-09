@@ -21,6 +21,12 @@ const getDashboardData = asyncHandler(async (req, res) => {
     );
 
     /* ===============================
+       2.5️⃣ Total Products
+    ================================ */
+    const totalProducts = products.length;
+
+
+    /* ===============================
        3️⃣ Critical Expiry Alerts
     ================================ */
     const criticalAlertsCount = products.filter(product => {
@@ -72,6 +78,8 @@ const getDashboardData = asyncHandler(async (req, res) => {
     res.json({
         totalInventoryValue,
         criticalAlertsCount,
+        userName: req.user.name,
+        totalProducts,
         topSellingProducts
     });
 });

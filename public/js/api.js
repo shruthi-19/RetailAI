@@ -1,51 +1,118 @@
-// A simple API layer
+// public/js/api.js
 
-const API_URL = '/api';
+const API_BASE = window.location.origin + "/api";
 
-// Function to get the JWT token from localStorage
-const getToken = () => localStorage.getItem('token');
+/* ========================================
+   HELPER FUNCTION (Auto attach token)
+======================================== */
 
-const apiFetch = async (endpoint, options = {}) => {
-    const token = getToken();
+const request = async (endpoint, options = {}) => {
+    const token = localStorage.getItem("token");
+
     const headers = {
-        'Content-Type': 'application/json',
-        ...options.headers,
+        ...(token && { Authorization: `Bearer ${token}` })
     };
 
-    if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
+    // Only attach JSON header if body exists
+    if (options.body) {
+        headers["Content-Type"] = "application/json";
     }
 
-    const response = await fetch(`${API_URL}${endpoint}`, { ...options, headers });
+    const config = {
+        ...options,
+        headers
+    };
 
-    if (!response.ok) {
-         let errorData;
-        const responseClone = response.clone(); // Clone the response
-        try {
-            errorData = await response.json(); // Try reading the original
-        } catch (e) {
-            // If response is not JSON, try to get text or provide a generic message
-            errorData = { message: await responseClone.text() || `Server error: ${response.statusText}` }; // Read the clone as a fallback
+    try {
+        const response = await fetch(`${API_BASE}${endpoint}`, config);
+
+        // Handle expired token
+        if (response.status === 401) {
+            localStorage.removeItem("token");
+            window.location.href = "/index.html";
+            return;
         }
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-    }
 
-    return response.json();
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.message || "API request failed");
+        }
+
+        return data;
+
+    } catch (error) {
+        console.error("API Error:", error);
+        throw error;
+    }
 };
 
-const api = {
-    getProducts: () => apiFetch('/products'),
-    getAlerts: () => apiFetch('/alerts'),
-    
-    getInsights: () => apiFetch('/insights'),
-    sellProduct: (id) => apiFetch(`/products/${id}/sell`, { method: 'PATCH' }),
-    login: (email, password) => apiFetch('/users/login', {
-        method: 'POST',
-        body: JSON.stringify({ email, password }),
-    }),
-    signup: (name, email, password) => apiFetch('/users/signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password }),
-    }),
+/* ========================================
+   AUTH APIs
+======================================== */
+
+const login = (email, password) =>
+    request("/users/login", {
+        method: "POST",
+        body: JSON.stringify({ email, password })
+    });
+
+const signup = (name, email, password) =>
+    request("/users/signup", {
+        method: "POST",
+        body: JSON.stringify({ name, email, password })
+    });
+
+/* ========================================
+   PRODUCT APIs
+======================================== */
+
+const getProducts = () => request("/products");
+
+const addProduct = (productData) =>
+    request("/products", {
+        method: "POST",
+        body: JSON.stringify(productData)
+    });
+
+const sellProduct = (id, quantity = 1) =>
+    request(`/products/${id}/sell`, {
+        method: "POST",
+        body: JSON.stringify({ quantity })
+    });
+
+const restockProduct = (id, quantity = 1) =>
+    request(`/products/${id}/restock`, {
+        method: "POST",
+        body: JSON.stringify({ quantity })
+    });
+
+/* ========================================
+   ALERTS & DASHBOARD
+======================================== */
+
+const getAlerts = () => request("/products/alerts");
+
+const getDashboardData = () => request("/dashboard");
+
+/* ========================================
+   INSIGHTS
+======================================== */
+
+const getInsights = () => request("/insights");
+
+/* ========================================
+   EXPORT GLOBAL API OBJECT
+======================================== */
+
+window.api = {
+    login,
+    signup,
+    getProducts,
+    addProduct,
+    sellProduct,
+    restockProduct,
+    getAlerts,
+    getDashboardData,
+    getInsights
 };

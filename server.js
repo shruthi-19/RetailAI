@@ -1,10 +1,12 @@
 require('dotenv').config();
 const express = require('express');
+const cors= require('cors');
 const connectDB = require('./db.js');
 const multer = require('multer');
 const productRoutes = require('./routes/productRoutes');
 const authRoutes = require('./routes/authRoutes');
 const insightsRoutes = require('./routes/insightsRoutes');
+const dashboardRoutes = require('./routes/dashboardRoutes');
 
 
 const app = express();
@@ -20,13 +22,18 @@ app.use(express.static('public'));
 const upload = multer({ dest: 'uploads/' });
 
 
-const cors = require('cors');
 app.use(cors());
+app.use(cors({
+    origin: true,
+    credentials: true
+}));
 
 // --- API Routes ---
 app.use('/api/products', productRoutes);
 app.use('/api/users', authRoutes);
 app.use('/api/insights', insightsRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+
 
 const startServer = async () => {
     try {
