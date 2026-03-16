@@ -89,28 +89,33 @@
         </section>
 
         <!-- INVENTORY VIEW -->
+                   
         <section id="inventory-view" class="view d-none">
             <h3 class="mb-4">Inventory Ledger</h3>
-
-            <div class="card shadow-sm">
-                <div class="card-body">
-
-                    <table class="table table-hover">
-                        <thead>
-                            <tr>
-                                <th>Product</th>
-                                <th>Quantity</th>
-                                <th>Price</th>
-                                <th>Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="inventory-table-body">
-                        </tbody>
-                    </table>
-
-                </div>
-            </div>
+            <div class="card">
+                        <div class="card-body">
+                            <div class="ledger-controls mb-3">
+                                <button class="btn btn-info" id="voice-command-btn" title="Voice Assistant"><i class="fas fa-microphone"></i></button>
+                                <button class="btn btn-secondary" onclick="document.getElementById('file-upload-input').click();" title="Upload CSV"><i class="fas fa-cloud-upload-alt"></i></button>
+                                <button class="btn btn-success" id="manual-add-btn"><i class="fas fa-plus"></i> Add Product</button>
+                                <input type="file" id="file-upload-input" class="hidden" accept=".csv">
+                            </div>
+                            <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Product Name</th>
+                                    <th>Quantity</th>
+                                    <th>Price</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="inventory-table-body">
+                                <!-- Product rows will be injected here by main.js -->
+                            </tbody>
+                        </table>
+                        </div>
+                    </div>
         </section>
 
         <!-- INSIGHTS VIEW -->
