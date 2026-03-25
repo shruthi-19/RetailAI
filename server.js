@@ -7,6 +7,7 @@ const productRoutes = require('./routes/productRoutes');
 const authRoutes = require('./routes/authRoutes');
 const insightsRoutes = require('./routes/insightsRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
+const transactionRoutes = require('./routes/transactionRoutes');
 
 
 const app = express();
@@ -33,6 +34,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/users', authRoutes);
 app.use('/api/insights', insightsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/transactions', transactionRoutes);
 
 
 const startServer = async () => {

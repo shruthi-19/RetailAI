@@ -8,15 +8,21 @@ const getInsights = async (req, res) => {
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-        const transactions = await Transaction.find({ saleDate: { $gte: thirtyDaysAgo } });
+        // Filter by user and transaction type, and use createdAt instead of saleDate
+        const transactions = await Transaction.find({ 
+            ownerID: req.user._id,
+            type: 'Sale',
+            createdAt: { $gte: thirtyDaysAgo } 
+        }).populate('product', 'name');
 
         // Group transactions by product
         const salesByProduct = transactions.reduce((acc, t) => {
-            const productId = t.productId.toString();
+            if (!t.product) return acc; // Skip if product doesn't exist
+            const productId = t.product._id.toString();
             if (!acc[productId]) {
-                acc[productId] = { name: t.productName, data: [] };
+                acc[productId] = { name: t.product.name, data: [] };
             }
-            acc[productId].data.push({ date: t.saleDate, quantity: t.quantitySold });
+            acc[productId].data.push({ date: t.createdAt, quantity: t.quantity });
             return acc;
         }, {});
 

@@ -21,6 +21,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const inventoryTableBody = document.getElementById("inventory-table-body");
     const insightsList = document.getElementById("insights-list");
+    const transactionsTableBody = document.getElementById("transactions-table-body");
 
     const totalValueEl = document.getElementById("total-value");
     const criticalAlertsEl = document.getElementById("critical-alerts");
@@ -37,6 +38,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Show selected view
         document.getElementById(viewId).classList.remove("d-none");
+        const selectedView = document.getElementById(viewId);
+        if (selectedView) {
+            selectedView.classList.remove("d-none");
+        }
 
         // Update active sidebar
         navLinks.forEach(link => {
@@ -53,6 +58,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (viewId === "inventory-view") {
             await loadInventory();
+        }
+        
+        if (viewId === "transactions-view") {
+            await loadTransactions();
         }
 
         if (viewId === "insights-view") {
@@ -79,6 +88,10 @@ document.addEventListener("DOMContentLoaded", () => {
             criticalAlertsEl.textContent = data.criticalAlertsCount;
             totalProductsEl.textContent = data.totalProducts;
             profileButton.textContent = data.userName;
+            if (totalValueEl) totalValueEl.textContent = `$${data.totalInventoryValue.toFixed(2)}`;
+            if (criticalAlertsEl) criticalAlertsEl.textContent = data.criticalAlertsCount;
+            if (totalProductsEl) totalProductsEl.textContent = data.totalProducts;
+            if (profileButton) profileButton.textContent = data.userName;
 
         } catch (error) {
             console.error("Dashboard load failed:", error.message);
@@ -100,26 +113,27 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     const renderInventory = (products) => {
-        inventoryTableBody.innerHTML = "";
-
-        if (!products.length) {
+        if (!inventoryTableBody) return;
+        
+        if (!Array.isArray(products) || !products.length) {
             inventoryTableBody.innerHTML = `
                 <tr><td colspan="5" class="text-center">No products found</td></tr>
             `;
             return;
         }
-
+        
+        let htmlContent = "";
         products.forEach(product => {
-
+        
             const status = product.expiryStatus || "Safe";
-
+        
             const badgeClass =
                 status === "Expired"
                     ? "bg-danger"
                     : status === "Warning"
                     ? "bg-warning text-dark"
                     : "bg-success";
-
+        
             const row = `
                 <tr>
                     <td>${product.name}</td>
@@ -138,9 +152,11 @@ document.addEventListener("DOMContentLoaded", () => {
                     </td>
                 </tr>
             `;
-
-            inventoryTableBody.innerHTML += row;
+            
+            htmlContent += row;
         });
+        
+        inventoryTableBody.innerHTML = htmlContent;
     };
 
     /* ========================================
@@ -178,6 +194,54 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     /* ========================================
+       TRANSACTIONS LOGIC
+    ======================================== */
+
+    const loadTransactions = async () => {
+        try {
+            const res = await fetch('/api/transactions', {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+            });
+            if (!res.ok) throw new Error('Failed to fetch transactions');
+            const transactions = await res.json();
+            renderTransactions(transactions);
+        } catch (error) {
+            console.error("Transactions load failed:", error.message);
+        }
+    };
+
+    const renderTransactions = (transactions) => {
+        if (!transactionsTableBody) return;
+        
+        if (!Array.isArray(transactions) || !transactions.length) {
+            transactionsTableBody.innerHTML = `
+                <tr><td colspan="4" class="text-center">No transactions found</td></tr>
+            `;
+            return;
+        }
+
+        let htmlContent = "";
+        transactions.forEach(t => {
+            const date = new Date(t.timestamp || t.createdAt).toLocaleString();
+            const productName = t.product ? t.product.name : "Unknown Product";
+            const typeBadge = t.type === 'Sale' ? 'bg-success' : 'bg-primary';
+
+            htmlContent += `
+                <tr>
+                    <td>${date}</td>
+                    <td>${productName}</td>
+                    <td><span class="badge ${typeBadge}">${t.type}</span></td>
+                    <td>${t.quantity}</td>
+                </tr>
+            `;
+        });
+        
+        transactionsTableBody.innerHTML = htmlContent;
+    };
+
+    /* ========================================
        INSIGHTS LOGIC
     ======================================== */
 
@@ -185,9 +249,9 @@ document.addEventListener("DOMContentLoaded", () => {
         try {
             const insights = await api.getInsights();
 
-            insightsList.innerHTML = "";
-
-            if (!insights.length) {
+            if (!insightsList) return;
+            
+            if (!Array.isArray(insights) || !insights.length) {
                 insightsList.innerHTML = `
                     <li class="list-group-item">
                         No insights available yet.
@@ -195,14 +259,16 @@ document.addEventListener("DOMContentLoaded", () => {
                 `;
                 return;
             }
-
+            
+            let htmlContent = "";
             insights.forEach(item => {
-                insightsList.innerHTML += `
+                htmlContent += `
                     <li class="list-group-item">
                         <strong>${item.name}:</strong> ${item.suggestion}
                     </li>
                 `;
             });
+            insightsList.innerHTML = htmlContent;
 
         } catch (error) {
             console.error("Insights load failed:", error.message);
